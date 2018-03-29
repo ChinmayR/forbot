@@ -2,12 +2,13 @@ package forbot
 
 import (
 	"bytes"
-	"io/ioutil"
-	"net/http"
-	"time"
-	"log"
-	"strings"
 	"encoding/json"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 )
 
 type Headers struct {
@@ -64,16 +65,15 @@ func NewConnection(accountID string, token string, live bool) *OandaConnection {
 	return connection
 }
 
-// TODO: include params as a second option
-func (c *OandaConnection) Request(endpoint string) []byte {
+func (c *OandaConnection) Request(endpoint string, params url.Values) []byte {
 	client := http.Client{
 		Timeout: time.Second * 5, // 5 sec timeout
 	}
 
-	url := createUrl(c.hostname, endpoint)
+	generatedUrl := createUrl(c.hostname, endpoint, params)
 
 	// New request object
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, generatedUrl, nil)
 	checkErr(err)
 
 	body := makeRequest(c, endpoint, client, req)
@@ -81,15 +81,15 @@ func (c *OandaConnection) Request(endpoint string) []byte {
 	return body
 }
 
-func (c *OandaConnection) Send(endpoint string, data []byte) []byte {
+func (c *OandaConnection) Send(endpoint string, data []byte, params url.Values) []byte {
 	client := http.Client{
 		Timeout: time.Second * 5, // 5 sec timeout
 	}
 
-	url := createUrl(c.hostname, endpoint)
+	generatedUrl := createUrl(c.hostname, endpoint, params)
 
 	// New request object
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, generatedUrl, bytes.NewBuffer(data))
 	checkErr(err)
 
 	body := makeRequest(c, endpoint, client, req)
@@ -97,27 +97,27 @@ func (c *OandaConnection) Send(endpoint string, data []byte) []byte {
 	return body
 }
 
-func (c *OandaConnection) Update(endpoint string, data []byte) []byte {
+func (c *OandaConnection) Update(endpoint string, data []byte, params url.Values) []byte {
 	client := http.Client{
 		Timeout: time.Second * 5,
 	}
 
-	url := createUrl(c.hostname, endpoint)
+	generatedUrl := createUrl(c.hostname, endpoint, params)
 
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPut, generatedUrl, bytes.NewBuffer(data))
 	checkErr(err)
 	body := makeRequest(c, endpoint, client, req)
 	return body
 }
 
-func createUrl(host string, endpoint string) string {
+func createUrl(host string, endpoint string, params url.Values) string {
 	var buffer bytes.Buffer
 	// Generate the auth header
 	buffer.WriteString(host)
 	buffer.WriteString(endpoint)
+	buffer.WriteString("?" + params.Encode())
 
-	url := buffer.String()
-	return url
+	return buffer.String()
 }
 
 func makeRequest(c *OandaConnection, endpoint string, client http.Client, req *http.Request) []byte {

@@ -1,17 +1,41 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/ChinmayR/forbot"
+	"github.com/ChinmayR/forbot/constants"
+	"github.com/ChinmayR/forbot/params"
 )
 
-const (
-	ACCOUNT_ID = "509983"
-	AUTH_TOKEN = "91e0ecb7a2d464feb06769ee342b14b0-d8b4f92f7590add749377505842e6a69"
-)
+var oandaCon = forbot.NewConnection(constants.ACCOUNT_ID, constants.AUTH_TOKEN, true)
 
 func main() {
-	oandaCon := forbot.NewConnection(ACCOUNT_ID, AUTH_TOKEN, true)
-	history := oandaCon.GetCandles("EUR_USD")
-	fmt.Println(history)
+	//location, _ := time.LoadLocation("UTC")
+	history := oandaCon.GetCandles("EUR_USD",
+		params.InstrumentCandlesParams{
+			Granularity: "M15",
+			From:        time.Now().AddDate(0, 0, -50),
+			To:          time.Now(),
+			//From: time.Date(2018, 2, 15, 0, 0, 0, 0, location),
+			//To:   time.Date(2018, 2, 28, 0, 0, 0, 0, location),
+		})
+
+	graphAnalysis := &forbot.GraphAnalysis{
+		Xv:        forbot.GetTimesFromCandles(history.Candles),
+		YvClose:   forbot.GetCloseFromCandles(history.Candles),
+		YvOpen:    forbot.GetOpenFromCandles(history.Candles),
+		YvLow:     forbot.GetLowFromCandles(history.Candles),
+		YvHigh:    forbot.GetHighFromCandles(history.Candles),
+		MinYRange: forbot.GetMinFromCandles(history.Candles),
+		MaxYRange: forbot.GetMaxFromCandles(history.Candles),
+	}
+
+	graphAnalysis.SaveGraph()
+	log.Println("Server started...")
+
+	http.HandleFunc("/", graphAnalysis.Handler)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
