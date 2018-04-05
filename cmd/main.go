@@ -1,41 +1,91 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/ChinmayR/forbot"
+	"github.com/ChinmayR/forbot/backtester"
 	"github.com/ChinmayR/forbot/constants"
-	"github.com/ChinmayR/forbot/params"
+	"github.com/aws/aws-lambda-go/lambda"
 )
 
-var oandaCon = forbot.NewConnection(constants.ACCOUNT_ID, constants.AUTH_TOKEN, true)
+type Request struct {
+	ID    float64 `json:"id"`
+	Value string  `json:"value"`
+}
+
+type Response struct {
+	Message string `json:"message"`
+	Ok      bool   `json:"ok"`
+}
+
+func LambdaHandler(request Request) (Response, error) {
+	fmt.Println("Running main now")
+	fmt.Println(runMain())
+	fmt.Println("Ran main successfully")
+	return Response{
+		Message: fmt.Sprintf("Success for request Id %f", request.ID),
+		Ok:      true,
+	}, nil
+}
+
+type GraphToSym struct {
+	Symbol        string
+	GraphAnalysis forbot.GraphAnalysis
+}
+
+func runMain() []GraphToSym {
+	var retVal []GraphToSym
+	for _, sym := range constants.Symbols {
+		graphAnalysis := forbot.GetGraphAnalysisForSymbol(
+			sym,
+			time.Now().AddDate(0, 0, -10),
+			time.Now().Add(time.Minute*-1))
+		retVal = append(retVal, GraphToSym{Symbol: sym, GraphAnalysis: graphAnalysis})
+	}
+	return retVal
+}
+
+const (
+	NORMAL = iota
+	IS_LAMBDA
+	IS_BACKTEST
+)
 
 func main() {
-	//location, _ := time.LoadLocation("UTC")
-	history := oandaCon.GetCandles("EUR_USD",
-		params.InstrumentCandlesParams{
-			Granularity: "M15",
-			From:        time.Now().AddDate(0, 0, -50),
-			To:          time.Now(),
-			//From: time.Date(2018, 2, 15, 0, 0, 0, 0, location),
-			//To:   time.Date(2018, 2, 28, 0, 0, 0, 0, location),
-		})
+	// run "GOOS=linux go build -o main"
+	executionType := IS_BACKTEST
+	if executionType == IS_LAMBDA {
 
-	graphAnalysis := &forbot.GraphAnalysis{
-		Xv:        forbot.GetTimesFromCandles(history.Candles),
-		YvClose:   forbot.GetCloseFromCandles(history.Candles),
-		YvOpen:    forbot.GetOpenFromCandles(history.Candles),
-		YvLow:     forbot.GetLowFromCandles(history.Candles),
-		YvHigh:    forbot.GetHighFromCandles(history.Candles),
-		MinYRange: forbot.GetMinFromCandles(history.Candles),
-		MaxYRange: forbot.GetMaxFromCandles(history.Candles),
+		lambda.Start(LambdaHandler)
+
+	} else if executionType == IS_BACKTEST {
+
+		symbol := constants.GBP_USD
+		handler := backtester.RunBacktest(
+			symbol,
+			time.Now().AddDate(0, 0, -10),
+			time.Now().Add(time.Minute*-1))
+
+		http.HandleFunc("/"+symbol, handler)
+		log.Println("Server started...")
+		log.Fatal(http.ListenAndServe(":8080", nil))
+
+	} else if executionType == NORMAL {
+
+		graphToSym := runMain()
+		for _, graphToSymIter := range graphToSym {
+			sym := graphToSymIter.Symbol
+			graphAnalysis := graphToSymIter.GraphAnalysis
+
+			//graphAnalysis.SaveGraph(sym)
+			http.HandleFunc("/"+sym, graphAnalysis.Handler)
+		}
+
+		log.Println("Server started...")
+		log.Fatal(http.ListenAndServe(":8080", nil))
 	}
-
-	graphAnalysis.SaveGraph()
-	log.Println("Server started...")
-
-	http.HandleFunc("/", graphAnalysis.Handler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
 }

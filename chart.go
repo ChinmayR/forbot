@@ -10,11 +10,15 @@ import (
 	"time"
 
 	"github.com/ChinmayR/forbot/constants"
+	"github.com/ChinmayR/forbot/params"
 	"github.com/wcharczuk/go-chart"
 	"github.com/wcharczuk/go-chart/util"
 )
 
+var oandaCon = NewConnection(constants.ACCOUNT_ID, constants.AUTH_TOKEN, true)
+
 type GraphAnalysis struct {
+	Symbol    string
 	Xv        []time.Time
 	YvClose   []float64
 	YvOpen    []float64
@@ -24,12 +28,34 @@ type GraphAnalysis struct {
 	MaxYRange float64
 }
 
+func GetGraphAnalysisForSymbol(symbol string, from, to time.Time) GraphAnalysis {
+	//location, _ := time.LoadLocation("UTC")
+	history := oandaCon.GetCandles(symbol,
+		params.InstrumentCandlesParams{
+			Granularity: "M15",
+			From:        from,
+			To:          to,
+		})
+
+	graphAnalysis := GraphAnalysis{
+		Symbol:    symbol,
+		Xv:        GetTimesFromCandles(history.Candles),
+		YvClose:   GetCloseFromCandles(history.Candles),
+		YvOpen:    GetOpenFromCandles(history.Candles),
+		YvLow:     GetLowFromCandles(history.Candles),
+		YvHigh:    GetHighFromCandles(history.Candles),
+		MinYRange: GetMinFromCandles(history.Candles),
+		MaxYRange: GetMaxFromCandles(history.Candles),
+	}
+	return graphAnalysis
+}
+
 func (ga *GraphAnalysis) Handler(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "image/png")
 	ga.GetGraph().Render(chart.PNG, res)
 }
 
-func (ga *GraphAnalysis) SaveGraph() {
+func (ga *GraphAnalysis) SaveGraph(fileNamePrefix string) {
 	collector := &chart.ImageWriter{}
 	ga.GetGraph().Render(chart.PNG, collector)
 
@@ -39,7 +65,7 @@ func (ga *GraphAnalysis) SaveGraph() {
 	}
 
 	curTime := time.Now()
-	fileName := "image-" + curTime.Format(constants.IMAGE_FORMAT) + ".png"
+	fileName := fileNamePrefix + "-image-" + curTime.Format(constants.IMAGE_FORMAT) + ".png"
 	f, _ := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0600)
 	defer f.Close()
 	png.Encode(f, image)
@@ -68,8 +94,8 @@ func (ga *GraphAnalysis) GetGraph() chart.Chart {
 		YValues: ga.YvHigh,
 	}
 
-	supAndResSeries, horizontalGridlines := ga.getSupAndResLevelsForAllDays()
-	//supAndResSeries, horizontalGridlines := []chart.Series{}, []chart.GridLine{}
+	//supAndResSeries, horizontalGridlines := ga.getSupAndResLevelsForAllDays()
+	supAndResSeries, horizontalGridlines := []chart.Series{}, []chart.GridLine{}
 
 	graph := chart.Chart{
 		Width:  1280,
@@ -86,6 +112,12 @@ func (ga *GraphAnalysis) GetGraph() chart.Chart {
 		},
 		YAxis: chart.YAxis{
 			Style: chart.Style{Show: true},
+			ValueFormatter: func(v interface{}) string {
+				if vf, isFloat := v.(float64); isFloat {
+					return fmt.Sprintf("%0.5f", vf)
+				}
+				return ""
+			},
 			Range: &chart.ContinuousRange{
 				Max: ga.MaxYRange,
 				Min: ga.MinYRange,
@@ -118,16 +150,16 @@ func (ga *GraphAnalysis) getVerticalGridLines() []chart.GridLine {
 
 func (ga *GraphAnalysis) getCustomLevelsForAllDays() []chart.Series {
 	var retVal = make([]chart.Series, 0)
-	for _, eachDay := range constants.StopRunPoints {
+	for _, eachDay := range constants.GetStopRunPointsForSymbol(ga.Symbol) {
 		for _, eachLevel := range eachDay.Values {
-			series := ga.getLevelsForDay(eachDay.Year, eachDay.Month, eachDay.Day, eachLevel)
+			series := ga.GetLevelsForDay(eachDay.Year, eachDay.Month, eachDay.Day, eachLevel)
 			retVal = append(retVal, series)
 		}
 	}
 	return retVal
 }
 
-func (ga *GraphAnalysis) getLevelsForDay(year, month, day int, value float64) chart.Series {
+func (ga *GraphAnalysis) GetLevelsForDay(year, month, day int, value float64) chart.Series {
 	singleDayDataX := make([]time.Time, 0)
 	singleDayDataY := make([]float64, 0)
 	for i, _ := range ga.Xv {
@@ -193,7 +225,7 @@ func isInSameDay(i, j time.Time) bool {
 func (ga *GraphAnalysis) FindSupAndRes() []Point {
 	// number of points to consider on each side of the current point
 	numPointsToConsider := 40
-	strengthThreshold := 3
+	strengthThreshold := 1
 	var localMaxOrMin = make([]Point, 0)
 
 	for i, point := range ga.YvClose {
