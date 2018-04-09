@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/ChinmayR/forbot/image_upload"
 )
 
 const (
@@ -17,11 +19,12 @@ const (
 	NUMBER_FROM = "+12065390831"
 )
 
-func SendMsgFromData(data string) {
+func SendMsgFromData(data string, imageName string) {
 	msgData := url.Values{}
 	msgData.Set("To", NUMBER_TO)
 	msgData.Set("From", NUMBER_FROM)
 	msgData.Set("Body", data)
+	msgData.Set("MediaUrl", image_upload.S3_BUCKET_RESOURCE_PREFIX+imageName)
 	msgDataReader := *strings.NewReader(msgData.Encode())
 
 	client := &http.Client{}
@@ -39,6 +42,6 @@ func SendMsgFromData(data string) {
 			fmt.Printf("Text sent: %s\n", respData["sid"])
 		}
 	} else {
-		fmt.Println(resp.Status)
+		fmt.Println(resp)
 	}
 }

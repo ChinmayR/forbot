@@ -55,7 +55,7 @@ func (ga *GraphAnalysis) Handler(res http.ResponseWriter, req *http.Request) {
 	ga.GetGraph().Render(chart.PNG, res)
 }
 
-func (ga *GraphAnalysis) SaveGraph(fileNamePrefix string) {
+func (ga *GraphAnalysis) SaveGraph(fileNamePrefix string) string {
 	collector := &chart.ImageWriter{}
 	ga.GetGraph().Render(chart.PNG, collector)
 
@@ -69,6 +69,7 @@ func (ga *GraphAnalysis) SaveGraph(fileNamePrefix string) {
 	f, _ := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0600)
 	defer f.Close()
 	png.Encode(f, image)
+	return fileName
 }
 
 func (ga *GraphAnalysis) GetGraph() chart.Chart {

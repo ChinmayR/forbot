@@ -20,24 +20,29 @@ var Symbols = []string{EUR_USD, GBP_USD, USD_JPY, EUR_JPY}
 type HourRange struct {
 	StartHour int
 	EndHour   int
+	Pip       float64
 }
 
 var ValidHours = map[string]HourRange{
 	"EUR_USD": HourRange{
 		StartHour: 0,
 		EndHour:   24,
+		Pip:       1 / 10000.0,
 	},
 	"GBP_USD": HourRange{
 		StartHour: 0,
 		EndHour:   24,
+		Pip:       1 / 10000.0,
 	},
 	"USD_JPY": HourRange{
 		StartHour: 0,
 		EndHour:   24,
+		Pip:       1 / 100.0,
 	},
 	"EUR_JPY": HourRange{
 		StartHour: 0,
 		EndHour:   24,
+		Pip:       1 / 100.0,
 	},
 }
 
@@ -66,16 +71,21 @@ var StopRunPoints_EUR_USD = []StopRunPoint{
 	{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 27, Values: []float64{1.2354, 1.2435, 1.2260, 1.2212}},
 	{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 28, Values: []float64{1.2260, 1.2282}},
 	{Symbol: EUR_USD, Year: 2018, Month: 3, Day: 29, Values: []float64{1.2355, 1.2375}},
+	{Symbol: EUR_USD, Year: 2018, Month: 4, Day: 9, Values: []float64{1.2342, 1.2375, 1.2261, 1.2219, 1.2168}},
 }
 
 var StopRunPoints_GBP_USD = []StopRunPoint{
 	{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 5, Values: []float64{1.4094, 1.4200, 1.4015}},
+	{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 6, Values: []float64{1.39898}},
+	{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 9, Values: []float64{1.40948}},
 }
 
 var StopRunPoints_USD_JPY = []StopRunPoint{}
 
 var StopRunPoints_EUR_JPY = []StopRunPoint{
 	{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 5, Values: []float64{131.77, 132.32, 130.87, 130.01}},
+	{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 6, Values: []float64{131.77, 132.32, 130.87, 130.01}},
+	{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 9, Values: []float64{131.77, 132.32, 130.87, 130.01}},
 }
 
 func GetStopRunPointsForSymbol(symbol string) []StopRunPoint {
