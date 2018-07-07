@@ -18,7 +18,7 @@ const (
 	awsSecret    = "67rO4hnup8su8UjZhqDZswDngr03xqWZTIJnL5pB"
 	token        = ""
 
-	S3_BUCKET_RESOURCE_PREFIX = `https://s3-us-west-2.amazonaws.com/forbotchinmayr/media/`
+	S3_BUCKET_RESOURCE_PREFIX = `https://s3-us-west-2.amazonaws.com/forbotchinmayr/media`
 )
 
 func UploadImage(fileName string) {

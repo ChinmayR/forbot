@@ -1,7 +1,7 @@
 package algorithm
 
 import (
-	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -15,62 +15,97 @@ import (
 
 type StopRunAlgo struct{}
 
-func (ba StopRunAlgo) RunAlgoFromTo(ga forbot.GraphAnalysis, from, to int) utils.TradeSignal {
-	retTradeSignal := utils.TradeSignal{}
-	for i := from; i < to; i += 1 {
-		xV := ga.Xv[i]
-		tradeSignal := ba.RunAlgo(ga, xV)
-		if tradeSignal.Signal {
-			retTradeSignal.Signal = tradeSignal.Signal
-			retTradeSignal.LevelCrossed = tradeSignal.LevelCrossed
-			retTradeSignal.SeriesToDraw = append(retTradeSignal.SeriesToDraw, tradeSignal.SeriesToDraw...)
-		}
-	}
-	return retTradeSignal
+func (sra StopRunAlgo) RunAlgo(ga forbot.GraphAnalysis, curTime time.Time) utils.TradeSignal {
+	panic("UNSUPPORTED, NEED A RANGE FROM, TO")
 }
 
-func (sra StopRunAlgo) RunAlgo(ga forbot.GraphAnalysis, curTime time.Time) utils.TradeSignal {
+func (ba StopRunAlgo) RunAlgoFromTo(ga forbot.GraphAnalysis, from, to int) utils.TradeSignal {
 	customLevels := constants.GetStopRunPointsForSymbol(ga.Symbol)
 	startValidHour, endValidHour := constants.GetValidHourForSymbol(ga.Symbol)
 
-	currentHour := curTime.Hour()
-	customPointsForCurTime := utils.GetCustomPointForTime(customLevels, curTime)
+	firstCandleInfo, foundFirstCandle := &CandleInfo{CandleNumber: NONE}, false
+	secondCandleInfo, foundSecondCandle := &CandleInfo{CandleNumber: NONE}, false
+	thirdCandleInfo, foundThirdCandle := &CandleInfo{CandleNumber: NONE}, false
 	var seriesToDraw = make([]chart.Series, 0)
-	if currentHour >= startValidHour && currentHour <= endValidHour {
-		// 1) search the last 8 candles for the first candle pattern
-		// 2) if first candle pattern found then search again for second candle pattern
-		// 3) if third candle pattern found then send text
+	retTradeSignal := utils.TradeSignal{Signal: false, SeriesToDraw: seriesToDraw}
+	sleepForCandles := 0
 
-		firstCandleInfo, foundFirstCandle := getFirstCandleInfo(ga, curTime, customPointsForCurTime)
-		if foundFirstCandle {
-			fmt.Printf("Found first candle for %v with %+v\n", ga.Symbol, firstCandleInfo)
-			// Draw first candle
-			seriesToDraw = append(seriesToDraw, draw.DrawCircleAtTime(ga, ga.Xv[firstCandleInfo.CandleIndex], ga.YvClose[firstCandleInfo.CandleIndex], drawing.ColorRed)...)
+	for i := from; i < to; i += 1 {
+		// set this to false so that this is only reflective of the last candle
+		retTradeSignal.Signal = false
 
-			secondCandleInfo, foundSecondCandle := getSecondCandleInfo(ga, curTime, *firstCandleInfo)
-			if foundSecondCandle {
-				fmt.Printf("Found second candle for %v with %+v\n", ga.Symbol, secondCandleInfo)
-				// Draw second candle
-				seriesToDraw = append(seriesToDraw, draw.DrawCircleAtTime(ga, ga.Xv[secondCandleInfo.CandleIndex], ga.YvClose[secondCandleInfo.CandleIndex], drawing.ColorBlue)...)
-				// ignore the third candle for now and just send the signal
-				return utils.TradeSignal{
-					Signal:       true,
-					LevelCrossed: firstCandleInfo.LevelPierced,
-					SeriesToDraw: seriesToDraw,
+		if sleepForCandles > 0 {
+			sleepForCandles--
+			continue
+		}
+		xV := ga.Xv[i]
+		currentHour := xV.Hour()
+		customPointsForCurTime := utils.GetCustomPointForTime(customLevels, xV)
+		if currentHour >= startValidHour && currentHour <= endValidHour {
+			// 1) search the last 8 candles for the first candle pattern
+			// 2) if first candle pattern found then search again for second candle pattern
+			// 3) if third candle pattern found then send text
+
+			if foundFirstCandle && foundSecondCandle && !foundThirdCandle {
+				// if more than 8 candles have passed, then reset, else try to find second candle
+				if i > (firstCandleInfo.CandleIndex + 8) {
+					firstCandleInfo, foundFirstCandle = &CandleInfo{CandleNumber: NONE}, false
+					secondCandleInfo, foundSecondCandle = &CandleInfo{CandleNumber: NONE}, false
+					thirdCandleInfo, foundThirdCandle = &CandleInfo{CandleNumber: NONE}, false
+				} else {
+					thirdCandleInfo, foundThirdCandle = getThirdCandleInfo(ga, xV, *firstCandleInfo)
+					if foundThirdCandle {
+						log.Printf("Found third candle for %v with %+v\n", ga.Symbol, thirdCandleInfo)
+						// Draw third candle
+						seriesToDraw = append(seriesToDraw, draw.DrawCircleAtTime(ga, ga.Xv[thirdCandleInfo.CandleIndex], ga.YvClose[thirdCandleInfo.CandleIndex], drawing.ColorRed)...)
+
+						retTradeSignal.Signal = true
+						retTradeSignal.LevelCrossed = firstCandleInfo.LevelPierced
+
+						// reset both first and second and third candle state
+						firstCandleInfo, foundFirstCandle = &CandleInfo{CandleNumber: NONE}, false
+						secondCandleInfo, foundSecondCandle = &CandleInfo{CandleNumber: NONE}, false
+						thirdCandleInfo, foundThirdCandle = &CandleInfo{CandleNumber: NONE}, false
+						sleepForCandles = 6 // sleep for 2 hours (if granularity is 15 mins candles)
+
+						continue
+					}
+				}
+			} else if foundFirstCandle && !foundSecondCandle {
+				// if more than 8 candles have passed, then reset, else try to find second candle
+				if i > (firstCandleInfo.CandleIndex + 8) {
+					firstCandleInfo, foundFirstCandle = &CandleInfo{CandleNumber: NONE}, false
+					secondCandleInfo, foundSecondCandle = &CandleInfo{CandleNumber: NONE}, false
+					thirdCandleInfo, foundThirdCandle = &CandleInfo{CandleNumber: NONE}, false
+				} else {
+					secondCandleInfo, foundSecondCandle = getSecondCandleInfo(ga, xV, *firstCandleInfo)
+					if foundSecondCandle {
+						log.Printf("Found second candle for %v with %+v\n", ga.Symbol, secondCandleInfo)
+						// Draw second candle
+						seriesToDraw = append(seriesToDraw, draw.DrawCircleAtTime(ga, ga.Xv[secondCandleInfo.CandleIndex], ga.YvClose[secondCandleInfo.CandleIndex], drawing.ColorBlue)...)
+						continue
+					}
+				}
+			}
+			if !foundFirstCandle {
+				firstCandleInfo, foundFirstCandle = getFirstCandleInfo(ga, xV, customPointsForCurTime)
+				if foundFirstCandle {
+					log.Printf("Found first candle for %v with %+v\n", ga.Symbol, firstCandleInfo)
+					// Draw first candle
+					seriesToDraw = append(seriesToDraw, draw.DrawCircleAtTime(ga, ga.Xv[firstCandleInfo.CandleIndex], ga.YvClose[firstCandleInfo.CandleIndex], drawing.ColorGreen)...)
+					continue
 				}
 			}
 		}
-
 	}
 
-	return utils.TradeSignal{
-		Signal:       false,
-		SeriesToDraw: seriesToDraw,
-	}
+	retTradeSignal.SeriesToDraw = seriesToDraw
+	return retTradeSignal
 }
 
 const (
-	CANDLE_ONE = iota
+	NONE = iota
+	CANDLE_ONE
 	CANDLE_TWO
 	CANDLE_THREE
 )
@@ -87,37 +122,33 @@ type CandleInfo struct {
 const upperPipThresholdOnPierce = 15 //pips
 
 func getFirstCandleInfo(ga forbot.GraphAnalysis, curTime time.Time, customPointsForCurTime constants.StopRunPoint) (*CandleInfo, bool) {
-	candlesToLookBack := 8
 	closestXvIndex := utils.GetClosestXvIndex(ga.Xv, curTime)
-	for i := candlesToLookBack; i >= 0; i-- {
-		indexToLookAt := closestXvIndex - i
-		for _, custLvl := range customPointsForCurTime.Values {
-			if custLvl < ga.YvHigh[indexToLookAt] && custLvl > ga.YvLow[indexToLookAt] {
-				didPierceUp := false
-				// check if pierced up or down
-				if ga.YvOpen[indexToLookAt] < custLvl {
-					didPierceUp = true
-				}
-				// check if the candle pierced by too much
-				pipAmount := constants.ValidHours[ga.Symbol].Pip
-				piercedByPips := math.Abs(ga.YvHigh[indexToLookAt] - custLvl)
-				piercedByPips = piercedByPips / pipAmount
-				if didPierceUp && piercedByPips > upperPipThresholdOnPierce {
-					return nil, false
-				}
-				piercedByPips = math.Abs(ga.YvLow[indexToLookAt] - custLvl)
-				piercedByPips = piercedByPips / pipAmount
-				if !didPierceUp && piercedByPips > upperPipThresholdOnPierce {
-					return nil, false
-				}
-
-				return &CandleInfo{
-					CandleNumber: CANDLE_ONE,
-					CandleIndex:  indexToLookAt,
-					LevelPierced: custLvl,
-					DidPierceUp:  didPierceUp,
-				}, true
+	for _, custLvl := range customPointsForCurTime.Values {
+		if custLvl < ga.YvHigh[closestXvIndex] && custLvl > ga.YvLow[closestXvIndex] {
+			didPierceUp := false
+			// check if pierced up or down
+			if ga.YvOpen[closestXvIndex] < custLvl {
+				didPierceUp = true
 			}
+			// check if the candle pierced by too much
+			pipAmount := constants.ValidHours[ga.Symbol].Pip
+			piercedByPips := math.Abs(ga.YvHigh[closestXvIndex] - custLvl)
+			piercedByPips = piercedByPips / pipAmount
+			if didPierceUp && piercedByPips > upperPipThresholdOnPierce {
+				return nil, false
+			}
+			piercedByPips = math.Abs(ga.YvLow[closestXvIndex] - custLvl)
+			piercedByPips = piercedByPips / pipAmount
+			if !didPierceUp && piercedByPips > upperPipThresholdOnPierce {
+				return nil, false
+			}
+
+			return &CandleInfo{
+				CandleNumber: CANDLE_ONE,
+				CandleIndex:  closestXvIndex,
+				LevelPierced: custLvl,
+				DidPierceUp:  didPierceUp,
+			}, true
 		}
 	}
 
@@ -125,17 +156,37 @@ func getFirstCandleInfo(ga forbot.GraphAnalysis, curTime time.Time, customPoints
 }
 
 func getSecondCandleInfo(ga forbot.GraphAnalysis, curTime time.Time, firstCandleInfo CandleInfo) (*CandleInfo, bool) {
-	indexToStartLooking := firstCandleInfo.CandleIndex + 1
-	for i := indexToStartLooking; i >= 0; i-- {
-		if firstCandleInfo.DidPierceUp && ga.YvClose[i] > firstCandleInfo.LevelPierced {
-			return nil, false
-		}
-		if !firstCandleInfo.DidPierceUp && ga.YvClose[i] < firstCandleInfo.LevelPierced {
-			return nil, false
-		}
+	closestXvIndex := utils.GetClosestXvIndex(ga.Xv, curTime)
+	if firstCandleInfo.DidPierceUp && ga.YvClose[closestXvIndex] > firstCandleInfo.LevelPierced {
+		return nil, false
+	}
+	if !firstCandleInfo.DidPierceUp && ga.YvClose[closestXvIndex] < firstCandleInfo.LevelPierced {
+		return nil, false
+	}
+	return &CandleInfo{
+		CandleNumber: CANDLE_TWO,
+		CandleIndex:  closestXvIndex,
+		LevelPierced: firstCandleInfo.LevelPierced,
+		DidPierceUp:  firstCandleInfo.DidPierceUp,
+	}, true
+
+	return nil, false
+}
+
+func getThirdCandleInfo(ga forbot.GraphAnalysis, curTime time.Time, firstCandleInfo CandleInfo) (*CandleInfo, bool) {
+	closestXvIndex := utils.GetClosestXvIndex(ga.Xv, curTime)
+	midPointOfFirstCandle := (ga.YvHigh[firstCandleInfo.CandleIndex] + ga.YvLow[firstCandleInfo.CandleIndex]) / float64(2)
+	returnTrue := false
+	if firstCandleInfo.DidPierceUp && ga.YvHigh[closestXvIndex] > midPointOfFirstCandle {
+		returnTrue = true
+	}
+	if !firstCandleInfo.DidPierceUp && ga.YvLow[closestXvIndex] < midPointOfFirstCandle {
+		returnTrue = true
+	}
+	if returnTrue {
 		return &CandleInfo{
-			CandleNumber: CANDLE_TWO,
-			CandleIndex:  i,
+			CandleNumber: CANDLE_THREE,
+			CandleIndex:  closestXvIndex,
 			LevelPierced: firstCandleInfo.LevelPierced,
 			DidPierceUp:  firstCandleInfo.DidPierceUp,
 		}, true

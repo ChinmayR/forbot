@@ -3,6 +3,7 @@ package twilio
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,7 +25,9 @@ func SendMsgFromData(data string, imageName string) {
 	msgData.Set("To", NUMBER_TO)
 	msgData.Set("From", NUMBER_FROM)
 	msgData.Set("Body", data)
-	msgData.Set("MediaUrl", image_upload.S3_BUCKET_RESOURCE_PREFIX+imageName)
+	if imageName != "" {
+		msgData.Set("MediaUrl", image_upload.S3_BUCKET_RESOURCE_PREFIX+imageName)
+	}
 	msgDataReader := *strings.NewReader(msgData.Encode())
 
 	client := &http.Client{}
@@ -39,7 +42,7 @@ func SendMsgFromData(data string, imageName string) {
 		decoder := json.NewDecoder(resp.Body)
 		err := decoder.Decode(&respData)
 		if err == nil {
-			fmt.Printf("Text sent: %s\n", respData["sid"])
+			log.Printf("Text sent: %s\n", respData["sid"])
 		}
 	} else {
 		fmt.Println(resp)

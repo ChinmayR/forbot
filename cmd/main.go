@@ -21,8 +21,8 @@ import (
 )
 
 type Request struct {
-	ID    float64 `json:"id"`
-	Value string  `json:"value"`
+	ID    string `json:"id"`
+	Value string `json:"value"`
 }
 
 type Response struct {
@@ -31,17 +31,49 @@ type Response struct {
 }
 
 func LambdaHandler(request Request) (Response, error) {
-	fmt.Println("Running main now")
-	fmt.Println(runMain(
-		time.Now().AddDate(0, 0, -2),
-		time.Now().Add(time.Minute*-1),
-		algorithm.BasicAlgo{}))
 
-	fmt.Println("Ran main successfully")
-	return Response{
+	retval := Response{
 		Message: fmt.Sprintf("Success for request Id %f", request.ID),
 		Ok:      true,
-	}, nil
+	}
+
+	PST, _ := time.LoadLocation("America/Los_Angeles")
+	curTimeInPST := time.Now().In(PST)
+	if curTimeInPST.Hour() >= 10 && curTimeInPST.Hour() < 21 {
+		log.Printf("Skipping run for %v, not meant to run from 10AM till 9PM\n", curTimeInPST.String())
+		return retval, nil
+	}
+
+	graphToSym := runMain(
+		time.Now().AddDate(0, 0, -5),
+		time.Now().Add(time.Minute*-1),
+		algorithm.StopRunAlgo{})
+
+	for _, graphToSymIter := range graphToSym {
+		sym := graphToSymIter.Symbol
+
+		http.HandleFunc("/"+sym, graphToSymIter.Handler)
+
+		tradeSignal := graphToSymIter.TradeSignal
+		log.Printf("Trade signal: %v", tradeSignal)
+		if tradeSignal.Signal {
+			fileName := SaveAnalyzedGraph(graphToSymIter.AnalyzedGraph, sym)
+			image_upload.UploadImage(fileName)
+			twilio.SendMsgFromData(fmt.Sprintf("%s - Crossed level %s", sym,
+				strconv.FormatFloat(tradeSignal.LevelCrossed, 'f', -1, 64)), fileName)
+		}
+
+		PST, _ := time.LoadLocation("America/Los_Angeles")
+		curTimeInPST := time.Now().In(PST)
+		// send a text with image if it is between 10:30PM to 10:45PM so the stop points are reflected
+		if constants.HasStopRunPointsForToday(graphToSymIter.Symbol) && curTimeInPST.Hour() == 22 && curTimeInPST.Minute() >= 30 && curTimeInPST.Minute() < 45 {
+			fileName := SaveAnalyzedGraph(graphToSymIter.AnalyzedGraph, sym)
+			image_upload.UploadImage(fileName)
+			os.RemoveAll(fileName)
+			twilio.SendMsgFromData("New levels for pair "+graphToSymIter.Symbol, fileName)
+		}
+	}
+	return retval, nil
 }
 
 type GraphToSym struct {
@@ -53,19 +85,21 @@ type GraphToSym struct {
 }
 
 func runMain(from, to time.Time, algoToRun utils.Algorithm) []GraphToSym {
+	log.Printf("Running main now from: %v to: %v algoToRun: %v\n", from, to, algoToRun)
 	var retVal []GraphToSym
 	for _, sym := range constants.Symbols {
+		log.Printf("Get graph analysis for symbol: %v\n", sym)
 		graphAnalysis := forbot.GetGraphAnalysisForSymbol(
 			sym,
 			from,
 			to)
 
+		log.Printf("Get analyzed graph for symbol: %v\n", sym)
 		handler, graph, tradeSignal := backtester.GetAnalyzedGraphAndHandler(
-			sym,
-			from,
-			to,
+			&graphAnalysis,
 			algoToRun)
 
+		log.Printf("Done for %v, with tradeSignal: %v \n", sym, tradeSignal.Signal)
 		retVal = append(retVal, GraphToSym{
 			Symbol:        sym,
 			GraphAnalysis: graphAnalysis,
@@ -78,14 +112,19 @@ func runMain(from, to time.Time, algoToRun utils.Algorithm) []GraphToSym {
 }
 
 const (
-	NORMAL = iota
-	IS_LAMBDA
+	IS_LAMBDA = iota
 	IS_BACKTEST
+	NORMAL
 )
 
 func main() {
+	// run "GOOS=linux go build -o main && zip -r main.zip main"
+
 	// run "GOOS=linux go build -o main"
-	executionType := IS_BACKTEST
+	// then run "zip -r main.zip main"
+	// then upload main.zip
+	executionType := NORMAL
+	log.Printf("Execution type: %v\n", executionType)
 	if executionType == IS_LAMBDA {
 
 		lambda.Start(LambdaHandler)
@@ -95,7 +134,7 @@ func main() {
 		graphToSym := runMain(
 			time.Now().AddDate(0, 0, -5),
 			time.Now().Add(time.Minute*-1),
-			algorithm.BasicAlgo{})
+			algorithm.StopRunAlgo{})
 
 		for _, graphToSymIter := range graphToSym {
 			http.HandleFunc("/"+graphToSymIter.Symbol, graphToSymIter.Handler)
@@ -109,7 +148,7 @@ func main() {
 		graphToSym := runMain(
 			time.Now().AddDate(0, 0, -5),
 			time.Now().Add(time.Minute*-1),
-			algorithm.BasicAlgo{})
+			algorithm.StopRunAlgo{})
 
 		for _, graphToSymIter := range graphToSym {
 			sym := graphToSymIter.Symbol
@@ -117,12 +156,23 @@ func main() {
 			http.HandleFunc("/"+sym, graphToSymIter.Handler)
 
 			tradeSignal := graphToSymIter.TradeSignal
-			//if sym == "GBP_USD" {
+
 			if tradeSignal.Signal {
 				fileName := SaveAnalyzedGraph(graphToSymIter.AnalyzedGraph, sym)
 				image_upload.UploadImage(fileName)
+				os.RemoveAll(fileName)
 				twilio.SendMsgFromData(fmt.Sprintf("%s - Crossed level %s", sym,
 					strconv.FormatFloat(tradeSignal.LevelCrossed, 'f', -1, 64)), fileName)
+			}
+
+			PST, _ := time.LoadLocation("America/Los_Angeles")
+			curTimeInPST := time.Now().In(PST)
+			// send a text with image if it is between 10:30PM to 10:45PM so the stop points are reflected
+			if constants.HasStopRunPointsForToday(graphToSymIter.Symbol) && curTimeInPST.Hour() == 22 && curTimeInPST.Minute() >= 30 && curTimeInPST.Minute() < 45 {
+				fileName := SaveAnalyzedGraph(graphToSymIter.AnalyzedGraph, sym)
+				image_upload.UploadImage(fileName)
+				os.RemoveAll(fileName)
+				twilio.SendMsgFromData("New levels for pair "+graphToSymIter.Symbol, fileName)
 			}
 		}
 
@@ -142,7 +192,7 @@ func SaveAnalyzedGraph(graph chart.Chart, fileNamePrefix string) string {
 	}
 
 	curTime := time.Now()
-	fileName := fileNamePrefix + "-image-" + curTime.Format(constants.IMAGE_FORMAT) + ".png"
+	fileName := "/tmp/" + fileNamePrefix + "-image-" + curTime.Format(constants.IMAGE_FORMAT) + ".png"
 	f, _ := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0600)
 	defer f.Close()
 	png.Encode(f, image)
