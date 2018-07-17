@@ -111,28 +111,21 @@ func runMain(from, to time.Time, algoToRun utils.Algorithm) []GraphToSym {
 	return retVal
 }
 
-const (
-	IS_LAMBDA = iota
-	IS_BACKTEST
-	NORMAL
-)
-
 func main() {
 	// run "GOOS=linux go build -o main && zip -r main.zip main"
 
 	// run "GOOS=linux go build -o main"
 	// then run "zip -r main.zip main"
 	// then upload main.zip
-	executionType := NORMAL
-	log.Printf("Execution type: %v\n", executionType)
-	if executionType == IS_LAMBDA {
+	log.Printf("Execution type: %v\n", constants.ExecutionType)
+	if constants.ExecutionType == constants.IS_LAMBDA {
 
 		lambda.Start(LambdaHandler)
 
-	} else if executionType == IS_BACKTEST {
+	} else if constants.ExecutionType == constants.IS_BACKTEST {
 
 		graphToSym := runMain(
-			time.Now().AddDate(0, 0, -5),
+			time.Now().AddDate(0, 0, -10),
 			time.Now().Add(time.Minute*-1),
 			algorithm.StopRunAlgo{})
 
@@ -143,7 +136,7 @@ func main() {
 		log.Println("Server started...")
 		log.Fatal(http.ListenAndServe(":8080", nil))
 
-	} else if executionType == NORMAL {
+	} else if constants.ExecutionType == constants.NORMAL {
 
 		graphToSym := runMain(
 			time.Now().AddDate(0, 0, -5),

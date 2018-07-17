@@ -1,0 +1,11 @@
+# This glide manifest is @generated and kept in sync by dep for backwards compatibility.
+# It is not a full glide manifest and will not work with traditional glide commands.
+import:
+- package: github.com/aws/aws-lambda-go
+  version: ^1.2.0
+- package: github.com/aws/aws-sdk-go
+  version: ^1.14.21
+- package: github.com/wcharczuk/go-chart
+  version: ^2.0.1
+- package: golang.org/x/net
+  version: master

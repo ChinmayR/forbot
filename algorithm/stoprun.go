@@ -15,7 +15,7 @@ import (
 
 type StopRunAlgo struct{}
 
-func (sra StopRunAlgo) RunAlgo(ga forbot.GraphAnalysis, curTime time.Time) utils.TradeSignal {
+func (ba StopRunAlgo) RunAlgo(ga forbot.GraphAnalysis, curTime time.Time) utils.TradeSignal {
 	panic("UNSUPPORTED, NEED A RANGE FROM, TO")
 }
 

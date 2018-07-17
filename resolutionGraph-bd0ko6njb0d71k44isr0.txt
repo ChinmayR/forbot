@@ -1,0 +1,21 @@
+digraph G{
+
+ 421873054 [label=" ROOT: \ngithub.com/ChinmayR/forbot\n" color=black]; 
+ 3167545290 [label="github.com/aws/aws-lambda-go\ntried: v1.2.0\nselected: v1.2.0" color=black];
+ 740327436 [label="golang.org/x/image\ntried: master\nselected: master" color=black];
+ 3324001469 [label="github.com/aws/aws-sdk-go\ntried: v1.14.21\nselected: v1.14.21" color=black];
+ 3124737126 [label="github.com/wcharczuk/go-chart\ntried: v2.0.1\nselected: v2.0.1" color=black];
+ 1843018790 [label="golang.org/x/net\ntried: master\nselected: master" color=black];
+ 2836899804 [label="github.com/go-ini/ini\ntried: v1.37.0\nselected: v1.37.0" color=black];
+ 1546265166 [label="github.com/jmespath/go-jmespath\ntried: 0b12d6b5\nselected: 0b12d6b5" color=black];
+ 2194055847 [label="github.com/golang/freetype\ntried: master\nselected: master" color=black];
+ 421873054->3167545290;
+ 421873054->3324001469;
+ 421873054->3124737126;
+ 421873054->1843018790;
+ 3124737126->2194055847;
+ 3124737126->740327436;
+ 3324001469->2836899804;
+ 3324001469->1546265166;
+ 2194055847->740327436;
+ }

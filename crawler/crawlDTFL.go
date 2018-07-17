@@ -76,7 +76,7 @@ func GetTodayManipulationPoints() ([]*CrawledPoints, error) {
 		return nil, err
 	}
 
-	crawledPoints, err := TokenizeMainPage(resp)
+	crawledPoints, err := TokenizeMainPage(resp, 5)
 	if err != nil {
 		twilio.SendMsgFromData(fmt.Sprintf("Error crawling: %v", err.Error()[0:100]), "")
 		return nil, err
@@ -106,12 +106,18 @@ func GetTodayManipulationPoints() ([]*CrawledPoints, error) {
 			</div>
 		</li>
 */
-func TokenizeMainPage(resp *http.Response) ([]*CrawledPoints, error) {
+func TokenizeMainPage(resp *http.Response, numLinksToVisit int) ([]*CrawledPoints, error) {
 	z := html.NewTokenizer(resp.Body)
 
 	retVal := make([]*CrawledPoints, 0)
 	var wg sync.WaitGroup
-	pagesToVisit := 5
+	pagesToVisit := numLinksToVisit
+
+	numThreadsAllowed := 5
+	threadSema := make(chan string, numThreadsAllowed)
+	for i := 0; i < numThreadsAllowed; i++ {
+		threadSema <- "free"
+	}
 
 	for {
 		tt := z.Next()
@@ -126,28 +132,32 @@ func TokenizeMainPage(resp *http.Response) ([]*CrawledPoints, error) {
 
 			if t.Data == "a" {
 				for _, a := range t.Attr {
-					if a.Key == "href" && strings.HasPrefix(a.Val, "xfa-blog-entry/daily-market-preview") && pagesToVisit > 0 {
+					if a.Key == "href" && strings.HasSuffix(a.Val, "/") && strings.HasPrefix(a.Val, "xfa-blog-entry/daily-market-preview") && pagesToVisit > 0 {
 
 						pagesToVisit--
-						wg.Add(1)
 						dailyPreviewUrl := "https://www.daytradingforexlive.com/forums/" + a.Val
+						wg.Add(1)
 
-						go func(url string, passedRetVal *[]*CrawledPoints, wg2 *sync.WaitGroup) {
+						go func(url string, passedRetVal *[]*CrawledPoints, wg2 *sync.WaitGroup, ch chan<- string) {
 							defer wg2.Done()
-							log.Println("Making Call: " + dailyPreviewUrl)
+							log.Printf("Making Call: %v\n", dailyPreviewUrl)
+							<-threadSema
 							respTemp, err := GetPageOfDTFL(dailyPreviewUrl)
 							if err != nil {
 								log.Println("Error while getting webpage: " + err.Error())
+								ch <- "free"
 								return
 							}
 							manPoints, innerPageDate, err := TokenizeInnerPage(respTemp)
 							if err != nil {
 								log.Println("Error while parsing inner webpage: " + err.Error())
+								ch <- "free"
 								return
 							}
 
 							if innerPageDate == nil {
 								log.Printf("ERROR: Returned no inner date for link %v so ignoring manpoints %v\n", dailyPreviewUrl, manPoints)
+								ch <- "free"
 								return
 							}
 
@@ -158,9 +168,10 @@ func TokenizeMainPage(resp *http.Response) ([]*CrawledPoints, error) {
 							*passedRetVal = append(*passedRetVal, crawlPoint)
 
 							log.Printf("Added: %v\n", crawlPoint)
+							ch <- "free"
 							return
 
-						}(dailyPreviewUrl, &retVal, &wg)
+						}(dailyPreviewUrl, &retVal, &wg, threadSema)
 
 						break
 					}

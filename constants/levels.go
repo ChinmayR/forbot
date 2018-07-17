@@ -1,10 +1,22 @@
 package constants
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/ChinmayR/forbot/crawler"
 )
+
+const (
+	IS_LAMBDA = iota
+	IS_BACKTEST
+	NORMAL
+)
+
+const ExecutionType = IS_BACKTEST
+const FILENAME = "allPoints"
 
 const (
 	ACCOUNT_ID = "509983"
@@ -67,46 +79,46 @@ type StopRunPoint struct {
 }
 
 var StopRunPoints_EUR_USD = []StopRunPoint{
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 15, Values: []float64{1.2521, 1.2388, 1.2303}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 16, Values: []float64{1.2521, 1.2458, 1.2388}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 19, Values: []float64{1.2456}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 20, Values: []float64{1.2435}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 21, Values: []float64{1.2372}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 22, Values: []float64{1.2372, 1.2435, 1.2212}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 23, Values: []float64{1.2319, 1.2297}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 26, Values: []float64{}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 27, Values: []float64{1.2354, 1.2435, 1.2260, 1.2212}},
-//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 28, Values: []float64{1.2260, 1.2282}},
-//{Symbol: EUR_USD, Year: 2018, Month: 3, Day: 29, Values: []float64{1.2355, 1.2375}},
-//{Symbol: EUR_USD, Year: 2018, Month: 4, Day: 9, Values: []float64{1.2342, 1.2375, 1.2261, 1.2219, 1.2168}},
-//{Symbol: EUR_USD, Year: 2018, Month: 4, Day: 10, Values: []float64{1.2289}},
-//
-//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 6, Values: []float64{1.1738, 1.1824, 1.1645}},
-//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 7, Values: []float64{1.1789, 1.1824, 1.1742, 1.1645}},
-//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 8, Values: []float64{1.1838, 1.1742, 1.1645}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 15, Values: []float64{1.2521, 1.2388, 1.2303}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 16, Values: []float64{1.2521, 1.2458, 1.2388}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 19, Values: []float64{1.2456}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 20, Values: []float64{1.2435}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 21, Values: []float64{1.2372}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 22, Values: []float64{1.2372, 1.2435, 1.2212}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 23, Values: []float64{1.2319, 1.2297}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 26, Values: []float64{}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 27, Values: []float64{1.2354, 1.2435, 1.2260, 1.2212}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 2, Day: 28, Values: []float64{1.2260, 1.2282}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 3, Day: 29, Values: []float64{1.2355, 1.2375}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 4, Day: 9, Values: []float64{1.2342, 1.2375, 1.2261, 1.2219, 1.2168}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 4, Day: 10, Values: []float64{1.2289}},
+	//
+	//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 6, Values: []float64{1.1738, 1.1824, 1.1645}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 7, Values: []float64{1.1789, 1.1824, 1.1742, 1.1645}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 8, Values: []float64{1.1838, 1.1742, 1.1645}},
 }
 
 var StopRunPoints_GBP_USD = []StopRunPoint{
-//{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 5, Values: []float64{1.4094, 1.4200, 1.4015}},
-//{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 6, Values: []float64{1.39898}},
-//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 5, Values: []float64{1.3350, 1.3330}},
-//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 6, Values: []float64{1.3412, 13477, 1.3335, 1.3303, 1.3259}},
-//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 7, Values: []float64{1.3436, 1.3477, 1.3303, 1.3259}},
-//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 8, Values: []float64{1.3469, 1.3379, 1.3303, 1.3259}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 5, Values: []float64{1.4094, 1.4200, 1.4015}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 4, Day: 6, Values: []float64{1.39898}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 5, Values: []float64{1.3350, 1.3330}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 6, Values: []float64{1.3412, 13477, 1.3335, 1.3303, 1.3259}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 7, Values: []float64{1.3436, 1.3477, 1.3303, 1.3259}},
+	//{Symbol: GBP_USD, Year: 2018, Month: 6, Day: 8, Values: []float64{1.3469, 1.3379, 1.3303, 1.3259}},
 }
 
 var StopRunPoints_USD_JPY = []StopRunPoint{
-//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 1, Values: []float64{109.07, 109.81, 108.12}},
+	//{Symbol: EUR_USD, Year: 2018, Month: 6, Day: 1, Values: []float64{109.07, 109.81, 108.12}},
 }
 
 var StopRunPoints_EUR_JPY = []StopRunPoint{
-//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 5, Values: []float64{131.77, 132.32, 130.87, 130.01}},
-//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 6, Values: []float64{131.77, 132.32, 130.87, 130.01}},
-//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 9, Values: []float64{131.77, 132.32, 130.87, 130.01}},
+	//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 5, Values: []float64{131.77, 132.32, 130.87, 130.01}},
+	//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 6, Values: []float64{131.77, 132.32, 130.87, 130.01}},
+	//{Symbol: EUR_JPY, Year: 2018, Month: 4, Day: 9, Values: []float64{131.77, 132.32, 130.87, 130.01}},
 }
 
 var StopRunPoints_AUD_USD = []StopRunPoint{
-//{Symbol: AUD_USD, Year: 2018, Month: 6, Day: 1, Values: []float64{0.7555, 0.7531}},
+	//{Symbol: AUD_USD, Year: 2018, Month: 6, Day: 1, Values: []float64{0.7555, 0.7531}},
 }
 
 func HasStopRunPointsForToday(symbol string) bool {
@@ -125,9 +137,26 @@ func HasStopRunPointsForToday(symbol string) bool {
 func GetStopRunPointsForSymbol(symbol string) []StopRunPoint {
 	retVal := make([]StopRunPoint, 0)
 
-	crawledPoints, err := crawler.GetTodayManipulationPoints()
-	if err != nil {
-		panic(err)
+	crawledPoints := make([]*crawler.CrawledPoints, 0)
+
+	if ExecutionType == IS_BACKTEST {
+		pointsFile, err := os.OpenFile(FILENAME, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Println(err)
+			return retVal
+		}
+		b, err := ioutil.ReadAll(pointsFile)
+		if err != nil {
+			log.Println(err)
+			return retVal
+		}
+		json.Unmarshal(b, &crawledPoints)
+	} else {
+		points, err := crawler.GetTodayManipulationPoints()
+		if err != nil {
+			panic(err)
+		}
+		crawledPoints = points
 	}
 
 	for _, crawledPoint := range crawledPoints {
